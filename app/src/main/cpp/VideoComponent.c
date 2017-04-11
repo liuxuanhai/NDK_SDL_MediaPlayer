@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -15,34 +15,38 @@ void alloc_picture(VideoState *is) {
 
     vp = &is->pictq[is->pictq_windex];
 
-    if (vp->bmp) {
-        SDL_DestroyTexture(vp->bmp);
+    if (is->bmp) {
+        SDL_DestroyTexture(is->bmp);
     }
 
     if (vp->rawdata) {
         av_free(vp->rawdata);
     }
 
-    if (vp->screen == NULL) {
-        vp->screen = SDL_CreateWindow("MediaPlayer", //窗口的标题
+    vp->width = is->video_st->codec->width;
+    vp->height = is->video_st->codec->height;
+
+    if (is->screen == NULL) {
+        int flags = SDL_WINDOW_OPENGL;
+#ifdef __ANDROID__
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#endif
+        is->screen = SDL_CreateWindow("MediaPlayer", //窗口的标题
                                       SDL_WINDOWPOS_UNDEFINED,//窗口的位置信息
                                       SDL_WINDOWPOS_UNDEFINED,
-                                      is->video_st->codec->width,
-                                      is->video_st->codec->height,//窗口的大小（长、宽
-                                      SDL_WINDOW_OPENGL);//窗口的 状态
+                                      vp->width,
+                                      vp->height,//窗口的大小（长、宽
+                                      flags);//窗口的 状态
     }
 
-    if (vp->renderer == NULL) {
-        vp->renderer = SDL_CreateRenderer(vp->screen, -1, 0);
+    if (is->renderer == NULL) {
+        is->renderer = SDL_CreateRenderer(is->screen, -1, 0);
     }
-    vp->bmp = SDL_CreateTexture(vp->renderer,
+    is->bmp = SDL_CreateTexture(is->renderer,
                                 SDL_PIXELFORMAT_YV12,
                                 SDL_TEXTUREACCESS_STREAMING,
                                 is->video_st->codec->width,
                                 is->video_st->codec->height);
-
-    vp->width = is->video_st->codec->width;
-    vp->height = is->video_st->codec->height;
 
     AVFrame *pFrameYUV = av_frame_alloc();
     if (pFrameYUV == NULL)
@@ -80,7 +84,7 @@ int queue_picture(VideoState *is, AVFrame *pFrame,
     vp = &is->pictq[is->pictq_windex];
 
     //如果图片跟显示区域大小不一致，需要通知主线程重新创建显示对象
-    if (!vp->bmp || vp->width != is->video_st->codec->width
+    if (!is->bmp || vp->width != is->video_st->codec->width
         || vp->height != is->video_st->codec->height) {
         SDL_Event event;
 
@@ -239,6 +243,7 @@ void schedule_refresh(VideoState *is,
 void video_refresh_timer(VideoState *is) {
     VideoPicture *vp;
     double actual_delay, delay, sync_threshold, ref_clock, diff;
+    if (is->play_state != PLAYING) return;
     if (is->video_st) {
         if (is->pictq_size == 0) {
             schedule_refresh(is, 1);
@@ -246,25 +251,26 @@ void video_refresh_timer(VideoState *is) {
         else {
             vp = &is->pictq[is->pictq_rindex];//加的
 
-            delay = vp->pts - is->frame_last_pts; /* the pts from last time */
+            delay = vp->pts - is->frame_last_pts;
             if (delay <= 0 || delay >= 1.0) {
-                /* if incorrect delay, use previous one */
                 delay = is->frame_last_delay;
             }
-            /* save for next time */
             is->frame_last_delay = delay;
             is->frame_last_pts = vp->pts;
 
-            /* update delay to sync to audio */
-            ref_clock = get_audio_clock(is);
-            diff = vp->pts - ref_clock;
+            if (is->audioStream > 0) {
+                ref_clock = get_audio_clock(is);
+                diff = vp->pts - ref_clock;
+            } else {
+                diff = 0;
+            }
 
             /* Skip or repeat the frame. Take delay into account
              FFPlay still doesn't "know if this is the best guess." */
             sync_threshold = (delay > AV_SYNC_THRESHOLD) ? delay : AV_SYNC_THRESHOLD;
             if (fabs(diff) < AV_NOSYNC_THRESHOLD) {
                 if (diff <= -sync_threshold) {
-                    delay = 0;
+                    delay = 0.0;
                 } else if (diff >= sync_threshold) {
                     delay = 2 * delay;
                 }
@@ -278,8 +284,7 @@ void video_refresh_timer(VideoState *is) {
             }
             schedule_refresh(is, (int) (actual_delay * 1000 + 0.5));
 
-            //  schedule_refresh(is, 80);
-            /* show the picture!将视频显示出来 */
+            /* 显示图片 */
             video_display(is);
 
             /* update queue for next picture! */
@@ -296,37 +301,78 @@ void video_refresh_timer(VideoState *is) {
     }
 }
 
+void calculateTargetRect(VideoState *is) {
+    if (is->targetRect) free(is->targetRect);
+    is->targetRect = malloc(sizeof(SDL_Rect));
+    double aspect_ratio;
+    int winW = 0, winH = 0;
+    if (is->screen) SDL_GetWindowSize(is->screen, &winW, &winH);
+    switch (is->show_mode) {
+        case FULL_SCREEN:
+            is->targetRect->x = 0;
+            is->targetRect->y = 0;
+            is->targetRect->w = winW;
+            is->targetRect->h = winH;
+            break;
+        case SRC_SIZE: //居中
+            is->targetRect->w = is->video_st->codec->width;
+            is->targetRect->h = is->video_st->codec->height;
+            is->targetRect->x = (winW - is->targetRect->w) / 2;
+            is->targetRect->y = (winH - is->targetRect->h) / 2;
+            break;
+        case MAX_SIZE_RATIO:
+            //计算比例，然后根据比例进行最大缩放，若屏幕和源的尺寸比例不一致将有黑边
+
+            //计算源画面宽高比例
+            if (is->video_st->codec->sample_aspect_ratio.num == 0) {
+                aspect_ratio = 0;
+            } else {
+                aspect_ratio = av_q2d(is->video_st->codec->sample_aspect_ratio)
+                               * is->video_st->codec->width / is->video_st->codec->height;
+            }
+            if (aspect_ratio <= 0.0) {
+                aspect_ratio = (float) is->video_st->codec->width
+                               / (float) is->video_st->codec->height;
+            }
+
+            if (aspect_ratio > ((double) winW / winH)) {    //width 最大化
+                is->targetRect->x = 0;
+                is->targetRect->w = winW;
+                is->targetRect->h =
+                        is->video_st->codec->height *
+                        ((double) winW / is->video_st->codec->width);
+                is->targetRect->y = (winH - is->targetRect->h) / 2; //竖直居中
+            } else { //height 最大化
+                is->targetRect->y = 0;
+                is->targetRect->h = winH;
+                is->targetRect->w = is->video_st->codec->width *
+                                    ((double) winH / is->video_st->codec->height);
+                is->targetRect->x = (winW - is->targetRect->w) / 2; //水平居中
+            }
+            break;
+    }
+}
+
 void video_display(VideoState *is) {
-    SDL_Rect rect;
+    SDL_Rect rect, desc;
     VideoPicture *vp;
-    float aspect_ratio;
     vp = &is->pictq[is->pictq_rindex];
-    if (vp->bmp) {
-        if (is->video_st->codec->sample_aspect_ratio.num == 0) {
-            aspect_ratio = 0;
-        } else {
-            aspect_ratio = av_q2d(is->video_st->codec->sample_aspect_ratio)
-                           * is->video_st->codec->width / is->video_st->codec->height;
-        }
-
-        if (aspect_ratio <= 0.0) {
-            aspect_ratio = (float) is->video_st->codec->width
-                           / (float) is->video_st->codec->height;
-        }
-
+    if (is->bmp) {
         rect.x = 0;
         rect.y = 0;
         rect.w = vp->width;
         rect.h = vp->height;
 
-        SDL_UpdateYUVTexture(vp->bmp, &rect,
+        SDL_UpdateYUVTexture(is->bmp, &rect,
                              vp->rawdata->data[0], vp->rawdata->linesize[0],
                              vp->rawdata->data[1], vp->rawdata->linesize[1],
                              vp->rawdata->data[2], vp->rawdata->linesize[2]);
 
-        SDL_RenderClear(vp->renderer);
-        // SDL_RenderCopy(vp->renderer, vp->bmp, &rect, &rect);
-        SDL_RenderCopy(vp->renderer, vp->bmp, NULL, NULL);
-        SDL_RenderPresent(vp->renderer);
+        SDL_RenderClear(is->renderer);
+        if (is->targetRect == NULL) {
+            calculateTargetRect(is);
+        }
+        SDL_RenderCopy(is->renderer, is->bmp, &rect, is->targetRect);
+        SDL_RenderPresent(is->renderer);
     }
 }

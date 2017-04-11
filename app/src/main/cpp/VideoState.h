@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -18,6 +18,14 @@
 
 //定义最大的音频缓存区大小
 #define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
+
+#define DEFAULT_SHOWMODE MAX_SIZE_RATIO
+
+typedef enum SHOW_MODE {
+    SRC_SIZE,
+    MAX_SIZE_RATIO,
+    FULL_SCREEN
+} SHOW_MODE;
 
 /**
  * 定义视频播放结构
@@ -98,6 +106,11 @@ typedef struct VideoState {
 
     //播放状态
     PLAY_STATE play_state;
+    SHOW_MODE show_mode;
+    SDL_Rect *targetRect;
+    SDL_Window *screen;
+    SDL_Renderer *renderer;
+    SDL_Texture *bmp;
 } VideoState;
 
 /** Functions **/

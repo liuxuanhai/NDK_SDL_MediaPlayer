@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -134,7 +134,7 @@ int audio_decode_frame(VideoState *is, double *pts_ptr) {
             return data_size;
         }
         if (pkt->data) {
-            av_packet_free(pkt);
+            av_packet_free(&pkt);
         }
         memset(pkt, 0, sizeof(*pkt));
         //从列队中读取一个音频包
@@ -189,7 +189,7 @@ int audio_stream_component_open(VideoState *is, int stream_index) {
     AVFormatContext *ic = is->ic;
 
     if (stream_index < 0 || stream_index >= ic->nb_streams) {
-        LOGE("音频流索引(%d)异常，小于0或大于最大值%d: %s\n", stream_index, ic->nb_streams);
+        LOGE("音频流索引(%d)异常，小于0或大于最大值%d: %s\n", stream_index, ic->nb_streams, is->filename);
         return -1;
     }
 

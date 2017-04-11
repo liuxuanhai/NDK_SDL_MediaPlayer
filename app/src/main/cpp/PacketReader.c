@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -124,6 +124,7 @@ int readPkt_thread(void *arg) {
                 continue;
             } else {    //读取出现异常或输入流已经结尾
                 LOGD("读取包出现异常或输入流已经结尾.\n");
+                is->play_state = FINISH;
                 break;
             }
         }
@@ -133,7 +134,7 @@ int readPkt_thread(void *arg) {
         } else if (packet->stream_index == is->audioStream) {
             packet_queue_put(&is->audioq, packet);
         } else {
-            av_packet_free(packet);
+            av_packet_free(&packet);
         }
     }
     LOGD("读包线程已结束.\n");
@@ -141,9 +142,6 @@ int readPkt_thread(void *arg) {
 
     error:
     is->play_state = ERROR;
-    SDL_Event event;
-    event.type = SDL_QUIT;
-    SDL_PushEvent(&event);
     return -1;
 }
 

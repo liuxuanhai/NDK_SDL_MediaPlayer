@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -10,6 +10,7 @@ VideoState *createVideoState(char *filename) {
     av_strlcpy(is->filename, filename, sizeof(is->filename));
     is->pictq_mutex = SDL_CreateMutex();
     is->pictq_cond = SDL_CreateCond();
+    is->show_mode = DEFAULT_SHOWMODE;
     return is;
 }
 
@@ -24,6 +25,26 @@ void destroyVideoState(VideoState *is) {
     if (is->pictq_cond) {
         SDL_DestroyCond(is->pictq_cond);
         is->pictq_cond = NULL;
+    }
+
+    if (is->targetRect) {
+        free(is->targetRect);
+        is->targetRect = NULL;
+    }
+
+    if (is->bmp) {
+        SDL_DestroyTexture(is->bmp);
+        is->bmp = NULL;
+    }
+
+    if (is->renderer) {
+        SDL_DestroyRenderer(is->renderer);
+        is->renderer = NULL;
+    }
+
+    if (is->screen) {
+        SDL_DestroyWindow(is->screen);
+        is->screen = NULL;
     }
 
     av_free(is);

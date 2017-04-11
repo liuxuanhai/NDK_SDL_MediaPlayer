@@ -1,4 +1,4 @@
-//
+﻿//
 // 日志工具
 // Created by xiang on 2017-4-8.
 // 这里我们只定义了3种级别的日志
@@ -8,8 +8,8 @@
 #define PLAYER_LOG_H
 
 #ifdef __ANDROID__
-//如果是android，就用anroid 的 log
-#include <android/log.h>
+//如果是android就用anroid 的 log
+#include <android/log.h>
 //这个是自定义的LOG的标识
 #define TAG "PlayerJni"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)

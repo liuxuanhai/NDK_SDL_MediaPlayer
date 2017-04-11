@@ -1,6 +1,7 @@
-/*
+﻿/*
     SDL_android_main.c, placed in the public domain by Sam Lantinga  3/13/14
 */
+#include <SDL_events.h>
 #include "SDL_android.h"
 
 #ifdef __ANDROID__
@@ -63,6 +64,9 @@ extern int Java_org_libsdl_app_SDLActivity_onNativeResize(JNIEnv *, jclass, jint
 JNIEXPORT int JNICALL Java_xwc_media_android_PlayActivity_onNativeResize(JNIEnv *env, jclass cls,
                                                                          jint a, jint b, jint c,
                                                                          jfloat d) {
+    SDL_Event event;
+    event.type = SDL_WINDOWEVENT_RESIZED;
+    SDL_PushEvent(&event);
     return Java_org_libsdl_app_SDLActivity_onNativeResize(env, cls, a, b, c, d);
 }
 

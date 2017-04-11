@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by xiang on 2017-4-8.
 //
 
@@ -28,10 +28,15 @@ void onHandMessage(SDL_Event *event, VideoState *is) {
             video_refresh_timer(event->user.data1);
             break;
         case SDL_QUIT:
-            is->play_state = QUIT;
+            if (is->play_state == PLAYING) is->play_state = QUIT;
             break;
         case SDL_KEYDOWN:
             onKeyDown(event->key.keysym.sym, is);
+            break;
+        case SDL_WINDOWEVENT_SIZE_CHANGED:
+        case SDL_WINDOWEVENT_RESIZED:
+            if (is->targetRect) free(is->targetRect);
+            is->targetRect = NULL;
             break;
     }
 }
@@ -48,11 +53,12 @@ PLAY_STATE playURI(char *filename) {
         //消息循环
         SDL_Event event;
         for (; ;) {
-            SDL_WaitEvent(&event);
-            //处理消息
-            onHandMessage(&event, is);
+            if (SDL_WaitEventTimeout(&event, 20)) {
+                //处理消息
+                onHandMessage(&event, is);
+            }
             //如果播放状态是出错，播放完毕，主动退出，则跳出消息循环
-            if (is->play_state == ERROR || is->play_state == FINISH || is->play_state == QUIT)
+            if (is->play_state != PLAYING && is->play_state != PAUSE)
                 break;
         }
     }

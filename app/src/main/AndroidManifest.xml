@@ -30,7 +30,7 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".PlayActivity"
-            android:configChanges="keyboardHidden|orientation"
+            android:configChanges="keyboardHidden|orientation|screenSize"
             android:label="MediaPlayer"
             android:theme="@style/AppTheme.FullScreen">
             <intent-filter>

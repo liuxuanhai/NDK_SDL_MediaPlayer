@@ -66,10 +66,15 @@ PLAY_STATE playURI(char *filename) {
     //保持状态
     PLAY_STATE hr = is->play_state;
 
+    is->audioq.enable = 0;
+    is->videoq.enable = 0;
+    SDL_CondSignal(is->videoq.cond);
+    SDL_CondSignal(is->audioq.cond);
+
     //等待其他线程退出
     int state;
     if (is->readPkt_tid) SDL_WaitThread(is->readPkt_tid, &state);
-    if (is->readPkt_tid) SDL_WaitThread(is->video_tid, &state);
+    if (is->video_tid) SDL_WaitThread(is->video_tid, &state);
 
     //销毁VideoState
     destroyVideoState(is);

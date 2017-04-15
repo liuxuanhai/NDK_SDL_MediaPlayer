@@ -1,4 +1,4 @@
-# Sets the minimum version of CMake required to build the native
+﻿# Sets the minimum version of CMake required to build the native
 # library. You should either keep the default value or only pass a
 # value of 3.4.0 or lower.
 
@@ -15,7 +15,6 @@ endforeach(lib)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/FFmpeg/include/ )
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/include )
-include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/FFmpeg/include/ )
 
 file(GLOB SOURCE_MAIN "${CMAKE_SOURCE_DIR}/src/main/cpp/*.c")
 

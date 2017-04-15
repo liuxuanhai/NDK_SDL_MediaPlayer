@@ -119,14 +119,9 @@ int readPkt_thread(void *arg) {
         }
         //读取下一个数据帧
         if (av_read_frame(is->ic, packet) < 0) {
-            if (is->ic->pb->error == 0) { //输入流数据未到，则等待
-                SDL_Delay(100);
-                continue;
-            } else {    //读取出现异常或输入流已经结尾
                 LOGD("读取包出现异常或输入流已经结尾.\n");
                 is->play_state = FINISH;
                 break;
-            }
         }
 
         if (packet->stream_index == is->videoStream) {
